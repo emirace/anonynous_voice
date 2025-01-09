@@ -17,6 +17,8 @@ import CallInviteDialog from "@/components/chat/CallInviteDialog";
 import { CallService } from "@/lib/call/call-service";
 import { useChatContactsStore } from "@/store/chat-contacts.store";
 import { useChatStore } from "@/store/useChatStore";
+import { VoiceCall } from "@/components/chat/VoiceCall";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatContact {
   id: string;
@@ -49,6 +51,7 @@ interface ReceivedMessage {
 
 export default function ChatInterface() {
   const router = useRouter();
+  const { toast } = useToast();
   const { appointments, refetch } = useAppointments();
   const { setFilteredContacts } = useChatContactsStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -63,6 +66,10 @@ export default function ChatInterface() {
   const [messageInput, setMessageInput] = useState("");
   const [incomingCall, setIncomingCall] = useState<CallInvitation | null>(null);
   const { addMessage } = useChatStore();
+  const [showCallScreen, setShowCallScreen] = useState<{
+    roomId: string;
+    isCaller: boolean;
+  } | null>(null);
 
   const currentActiveUser = useMemo(() => AuthService.getStoredUser(), []);
   const currentUser = useMemo(
@@ -241,7 +248,7 @@ export default function ChatInterface() {
     );
 
     socket.on("call:accept", ({ roomId }) => {
-      router.push(`/chat/video-call?roomId=${roomId}&caller=false`);
+      setShowCallScreen({ roomId, isCaller: true });
     });
 
     socket.on("call:reject", () => {
@@ -258,7 +265,7 @@ export default function ChatInterface() {
     if (!incomingCall || !socket) return;
     CallService.acceptCall(socket, incomingCall.roomId);
     setIncomingCall(null);
-    router.push(`/chat/video-call?roomId=${incomingCall.roomId}&caller=false`);
+    setShowCallScreen({ roomId: incomingCall.roomId, isCaller: false });
   };
 
   const handleRejectCall = () => {
@@ -269,6 +276,10 @@ export default function ChatInterface() {
 
   const handlePhoneClick = () => {
     if (!socket || !selectedUser) return;
+    toast({
+      title: "Calling...",
+      description: `Calling ${selectedUser.username}`,
+    });
     const roomId = CallService.generateRoomId();
     const invitation: CallInvitation = {
       roomId,
@@ -277,14 +288,17 @@ export default function ChatInterface() {
       type: "audio",
     };
     CallService.sendCallInvitation(socket, invitation);
-    router.push(`/chat/video-call?roomId=${roomId}&caller=true`);
+  };
+
+  const handleEndCall = () => {
+    setShowCallScreen(null);
   };
 
   if (!currentActiveUser?.userName) {
     return <Loading />;
   }
 
-  return (
+  return !showCallScreen ? (
     <div className="flex h-screen bg-background">
       <aside className="hidden md:flex w-full max-w-[20vw] flex-col border-r">
         {isLoading ? (
@@ -338,5 +352,12 @@ export default function ChatInterface() {
         />
       )}
     </div>
+  ) : (
+    <VoiceCall
+      isCaller={showCallScreen.isCaller}
+      onEndCall={handleEndCall}
+      roomId={showCallScreen.roomId}
+      socket={socket!}
+    />
   );
 }

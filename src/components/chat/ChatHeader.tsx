@@ -46,6 +46,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   setIsSidebarOpen,
   lastActiveTime,
   currentUser,
+  onPhoneClick,
 }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -210,7 +211,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       </div>
 
       {currentUser.role === "mentor" && (
-        <CallButton menteeId={selectedUser.id} />
+        <CallButton onPhoneClick={onPhoneClick} />
       )}
     </header>
   );
